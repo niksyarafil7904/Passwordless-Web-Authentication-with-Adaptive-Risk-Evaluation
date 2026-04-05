@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String               @id @default(cuid())
+  username       String               @unique
+  email          String               @unique
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  loginAttempts  LoginAttempt[]
+  otpTokens      OtpToken[]
+  trustedDevices TrustedDevice[]
+  credentials    WebAuthnCredential[]
+}
+
+model WebAuthnCredential {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId Bytes     @unique
+  publicKey    Bytes
+  counter      Int       @default(0)
+  transports   String[]  @default([])
+  deviceName     String?
+  deviceOS       String?
+  deviceBrowser  String?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+}
+
+model TrustedDevice {
+  id          String   @id @default(cuid())
+  userId      String
+  deviceKey   String
+  label       String?
+  userAgent   String?
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceKey])
+}
+
+model LoginAttempt {
+  id         String   @id @default(cuid())
+  userId     String?
+  username   String?
+  success    Boolean
+  riskScore  Int
+  riskLevel  String
+  riskReasons String?
+  stepUpUsed Boolean  @default(false)
+  ip         String?
+  location   String?
+  userAgent  String?
+  deviceKey  String?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id])
+}
+
+model OtpToken {
+  id        String    @id @default(cuid())
+  userId    String
+  otpHash   String
+  purpose   String    @default("STEP_UP") // STEP_UP, PASSWORD_RESET, etc
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, createdAt])
+}
+
