@@ -3,12 +3,20 @@ import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 
-console.log("CWD =", process.cwd());
-console.log("ENV PATH =", path.join(process.cwd(), ".env"));
+// Only load .env in development (not in production/Railway)
+if (process.env.NODE_ENV !== 'production') {
+  const result = dotenv.config({ override: true });
+  console.log("DOTENV parsed =", result.parsed);
+  if (result.error) {
+    console.log("DOTENV error =", result.error);
+  }
+} else {
+  console.log("Running in production mode - using environment variables");
+}
 
-const result = dotenv.config({ override: true });
-console.log("DOTENV parsed =", result.parsed);
-console.log("DOTENV error  =", result.error);
+console.log("CWD =", process.cwd());
+console.log("BOOT ORIGIN =", process.env.ORIGIN);
+console.log("BOOT RP_ID  =", process.env.RP_ID);
 
 console.log("BOOT ORIGIN =", process.env.ORIGIN);
 console.log("BOOT RP_ID  =", process.env.RP_ID);
@@ -121,8 +129,8 @@ app.use(
     }),
     cookie: {
       httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
       maxAge: 1000 * 60 * 60 * 24,
     },
   }),
