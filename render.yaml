@@ -4,6 +4,7 @@ services:
     runtime: node
     rootDir: backend
     buildCommand: npm install && npm run build
+    preDeployCommand: npx prisma migrate deploy
     startCommand: npm start
     envVars:
       # Node version
@@ -16,7 +17,7 @@ services:
       
       # Database (you'll need to change this to your Neon URL later)
       - key: DATABASE_URL
-        value: postgresql://neondb_owner:npg_njvJqIEz71Ht@ep-long-snow-a1h2zjm2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+        value: postgresql://neondb_owner:npg_njvJqIEz71Ht@ep-long-snow-a1h2zjm2-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       
       # Session secret
       - key: SESSION_SECRET
