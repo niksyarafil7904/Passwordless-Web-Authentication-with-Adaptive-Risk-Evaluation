@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: passwordless-auth-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      # Node version
+      - key: NODE_VERSION
+        value: 20.18.0
+      
+      # Force install all dependencies
+      - key: NPM_CONFIG_PRODUCTION
+        value: false
+      
+      # Database (you'll need to change this to your Neon URL later)
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_njvJqIEz71Ht@ep-long-snow-a1h2zjm2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+      
+      # Session secret
+      - key: SESSION_SECRET
+        value: 0496744e0f805623739be8ff9c5cb2edb411406a99391a9f903480d51c4938e3
+      
+      # WebAuthn config
+      - key: RP_ID
+        value: auth.testonline.digital
+      - key: RP_NAME
+        value: PasswordlessAuthFYP
+      - key: ORIGIN
+        value: https://auth.testonline.digital
+      
+      # Environment
+      - key: NODE_ENV
+        value: production    
+      
+      - key: PORT
+        value: 4000
+      
+      # GeoIP
+      - key: MAXMIND_DB_PATH
+        value: ./GeoLite2-City.mmdb
+      
+      # SMTP Email
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: '465'
+      - key: SMTP_SECURE
+        value: 'true'
+      - key: SMTP_USER
+        value: niksyarafil2004@gmail.com
+      - key: SMTP_PASS
+        value: yijwyckwvsuwwlhy
+      - key: SMTP_FROM
+        value: "PasswordlessAuthFYP <niksyarafil2004@gmail.com>"
+      
+      # OTP
+      - key: OTP_PEPPER
+        value: 072c97191721bc67ffa8500c832db3a8e733e7837a79dfb942f2dd67a67def35
