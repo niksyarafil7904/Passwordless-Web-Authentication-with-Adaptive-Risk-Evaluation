@@ -11,12 +11,14 @@ model User {
   id             String               @id @default(cuid())
   username       String               @unique
   email          String               @unique
+  isAdmin        Boolean              @default(false)
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
   loginAttempts  LoginAttempt[]
   otpTokens      OtpToken[]
   trustedDevices TrustedDevice[]
   credentials    WebAuthnCredential[]
+  adminRecoveryCodes    AdminRecoveryCode[]
 }
 
 model WebAuthnCredential {
@@ -77,5 +79,17 @@ model OtpToken {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, purpose, createdAt])
+}
+
+model AdminRecoveryCode {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code      String   
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([code])
 }
 

@@ -115,7 +115,7 @@ webauthnRouter.post("/register/options", async (req, res) => {
   });
 
   req.session.webauthnRegChallenge = options.challenge;
-  req.session.pendingUserId = String(user.id); // Convert to string
+  req.session.pendingUserId = String(user.id);
 
   console.log("OPTIONS sessionID:", req.sessionID);
   console.log("OPTIONS challenge:", req.session.webauthnRegChallenge);
@@ -217,7 +217,6 @@ webauthnRouter.post("/register/verify", async (req, res) => {
       ((body as any)?.clientExtensionResults?.transports as string[] | undefined) ??
       null;
 
-    // Parse user agent for device info
     const userAgent = getUserAgent(req);
     const deviceInfo = parseUserAgent(userAgent);
 
@@ -236,9 +235,8 @@ webauthnRouter.post("/register/verify", async (req, res) => {
 
     delete req.session.webauthnRegChallenge;
     delete req.session.pendingUserId;
-    req.session.userId = pendingUserId; // Already a string
+    req.session.userId = pendingUserId;
 
-    // Store the credential ID for this session
     const newCredential = await prisma.webAuthnCredential.findFirst({
       where: { credentialId: toPrismaBytes(credentialIdBuf) },
       select: { id: true },
@@ -322,7 +320,7 @@ webauthnRouter.post("/login/options", async (req, res) => {
   });
 
   req.session.webauthnAuthChallenge = options.challenge;
-  req.session.pendingUserId = String(user.id); // Convert to string
+  req.session.pendingUserId = String(user.id);
   req.session.pendingUsername = user.username;
 
   console.log("LOGIN OPTIONS sessionID:", req.sessionID);
@@ -331,7 +329,7 @@ webauthnRouter.post("/login/options", async (req, res) => {
   return res.json({ ok: true, options });
 });
 
-// 4) Login Verify (Assertion Verify)
+// 4) Login Verify (Assertion Verify) - UPDATED with admin detection
 webauthnRouter.post("/login/verify", async (req, res) => {
   try {
     const body = req.body as AuthenticationResponseJSON;
@@ -344,7 +342,6 @@ webauthnRouter.post("/login/verify", async (req, res) => {
     console.log("LOGIN VERIFY body.id:", (body as any)?.id);
 
     if (!expectedChallenge || !pendingUserId) {
-      // Only log if we have userId
       if (pendingUserId) {
         await logLoginAttempt({
           success: false,
@@ -462,7 +459,6 @@ webauthnRouter.post("/login/verify", async (req, res) => {
     const deviceKey = credentialIdB64;
     const ip = getClientIp(req);
     
-    // Add timeout for geo lookup
     console.log("Getting geo location...");
     let geo = { label: "Unknown Location" };
     try {
@@ -471,12 +467,10 @@ webauthnRouter.post("/login/verify", async (req, res) => {
       console.log("Geo complete:", geo.label);
     } catch (geoError) {
       console.error("GeoIP error:", geoError);
-      // Continue with default geo (Unknown Location)
     }
 
-    // Add timeout for risk scoring
     console.log("Scoring login risk...");
-    let risk: RiskResult = {  // ← Add explicit type
+    let risk: RiskResult = {
       riskScore: 0,
       riskLevel: 'low',
       reasons: [],
@@ -495,7 +489,6 @@ webauthnRouter.post("/login/verify", async (req, res) => {
       console.log("Risk score complete:", risk.riskLevel);
     } catch (riskError) {
       console.error("Risk scoring error or timeout:", riskError);
-      // risk already has default low risk
     }
 
     console.log("Creating login attempt...");
@@ -516,12 +509,10 @@ webauthnRouter.post("/login/verify", async (req, res) => {
       select: { id: true },
     });
 
-    // Clear transient WebAuthn session state
     delete req.session.webauthnAuthChallenge;
     delete req.session.pendingUserId;
     delete req.session.pendingUsername;
 
-    // Store the credential ID for this session (for dashboard device tracking)
     req.session.currentCredentialId = String(matched.id);
 
     // HIGH risk: require step-up OTP
@@ -529,7 +520,7 @@ webauthnRouter.post("/login/verify", async (req, res) => {
       console.log("High risk detected, requiring OTP...");
       const user = await prisma.user.findUnique({
         where: { id: matched.userId },
-        select: { email: true, username: true },
+        select: { email: true, username: true, isAdmin: true },
       });
 
       if (!user?.email) {
@@ -552,10 +543,14 @@ webauthnRouter.post("/login/verify", async (req, res) => {
         createdAt: Date.now(),
       };
 
+      req.session.isAdmin = user.isAdmin;
+
       return res.json({
         ok: false,
         verified: true,
         requiresOtp: true,
+        isAdmin: user.isAdmin,
+        redirectTo: user.isAdmin ? "/admin/dashboard" : "/dashboard",
         riskScore: risk.riskScore,
         riskLevel: risk.riskLevel,
         reasons: risk.reasons,
@@ -566,10 +561,21 @@ webauthnRouter.post("/login/verify", async (req, res) => {
     console.log("Low risk login, setting session...");
     req.session.userId = String(matched.userId);
 
-    console.log("Login successful!");
+    // Check if user is admin
+    const user = await prisma.user.findUnique({
+      where: { id: matched.userId },
+      select: { isAdmin: true },
+    });
+
+    req.session.isAdmin = user?.isAdmin || false;
+
+    console.log("Login successful! isAdmin:", req.session.isAdmin);
+
     return res.json({
       ok: true,
       verified: true,
+      isAdmin: req.session.isAdmin,
+      redirectTo: req.session.isAdmin ? "/admin/dashboard" : "/dashboard",
       riskScore: risk.riskScore,
       riskLevel: risk.riskLevel,
       reasons: risk.reasons,
@@ -578,7 +584,6 @@ webauthnRouter.post("/login/verify", async (req, res) => {
   } catch (err: any) {
     console.error("Login Verify Error FULL:", err);
 
-    // Try to get userId from session
     const userId = req.session.pendingUserId || req.session.userId;
     if (userId) {
       await logLoginAttempt({

@@ -18,9 +18,6 @@ console.log("CWD =", process.cwd());
 console.log("BOOT ORIGIN =", process.env.ORIGIN);
 console.log("BOOT RP_ID  =", process.env.RP_ID);
 
-console.log("BOOT ORIGIN =", process.env.ORIGIN);
-console.log("BOOT RP_ID  =", process.env.RP_ID);
-
 import express from "express";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
@@ -34,13 +31,11 @@ import pg from "pg";
 
 import { healthRouter } from "./routes/health";
 import { webauthnRouter } from "./routes/webauthn";
+import { adminRouter } from './routes/admin';
 
 import { otpRouter } from "./routes/otp";
 import { dashboardRouter } from "./routes/dashboard";
 import { requireAuth, requireDashboardAccess, redirectIfLoggedIn } from "./middleware/auth";
-
-console.log("BOOT ORIGIN =", process.env.ORIGIN);
-console.log("BOOT RP_ID  =", process.env.RP_ID);
 
 const app = express();
 
@@ -163,6 +158,7 @@ app.use((req, res, next) => {
 app.use(healthRouter);
 app.use("/webauthn", webauthnRouter);
 app.use("/otp", otpRouter); 
+app.use('/admin', adminRouter);
 
 // --------------------
 // Protected API Routes (auth required)
@@ -217,6 +213,17 @@ if (fs.existsSync(frontendIndexHtml)) {
     res.sendFile(frontendIndexHtml);
   });
 
+  // Admin dashboard route - requires admin authentication
+  app.get('/admin/*', (req, res, next) => {
+    if (!req.session.userId) {
+      return res.redirect('/login');
+    }
+    if (!req.session.isAdmin) {
+      return res.status(403).send('Admin access required');
+    }
+    res.sendFile(frontendIndexHtml);
+  });
+
   // SPA fallback: serve index.html for non-API routes (with protection)
   app.get(/.*/, (req, res, next) => {
     // Skip API routes
@@ -226,7 +233,8 @@ if (fs.existsSync(frontendIndexHtml)) {
         req.path.startsWith("/me") ||
         req.path.startsWith("/devices") ||
         req.path.startsWith("/activity") ||
-        req.path.startsWith("/logout")) {
+        req.path.startsWith("/logout") ||
+        req.path.startsWith("/admin")) {
       return next();
     }
     

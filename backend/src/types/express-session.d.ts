@@ -6,6 +6,7 @@ declare module "express-session" {
     userId?: string;
     username?: string;
     role?: "USER" | "ADMIN";
+    isAdmin?: boolean;
     stepUpVerified?: boolean;
 
     // During WebAuthn flows (temporary)
